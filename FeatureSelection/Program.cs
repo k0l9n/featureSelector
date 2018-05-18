@@ -70,6 +70,20 @@ namespace FeatureSelection
         public abstract double Evaluate(IChromosome chromosome);
     }
 
+    class EvaluationResult
+    {
+        public EvaluationResult()
+        {
+            ErrorHistory = new List<double>();
+        }
+        public int CurrentIterationCount { get; set; }
+        public double CurrentError { get; set; }
+        public List<double> ErrorHistory { get; set; }
+        public bool IsErrorOnTest { get; set; }
+
+    }
+
+
     class InformativeFitness : InformativeFitnessFuncion
     {
         public double Momentum { get; set; } = 0;
@@ -80,7 +94,37 @@ namespace FeatureSelection
         public int[] NetworkLayers { get; set; }
 
         public bool AutoShuffle { get; set; }
-   
+
+        #region EvaluationStopFactor
+
+        public int MaxIterationCount { get; set; }
+
+        private double _errorPart;
+
+        public double ErrorPart
+        {
+            get => _errorPart;
+            set
+            {
+                if (value < 0)
+                {
+                    _errorPart = 0;
+                }
+                else if(value > 100)
+                {
+                    _errorPart = 100;
+                }
+                else
+                {
+                    _errorPart = value;
+                }
+            }
+        }
+
+        public int ErrorPartNotChanged { get; set; }
+
+        #endregion
+
         public InformativeFitness(List<string> data)
         {
             //var data = FileWorker.ReadFile(@"C:\Users\Nick\Desktop\data\data\optdigits.txt");
@@ -149,6 +193,8 @@ namespace FeatureSelection
             };
             // loop
             int teachRuns = MaxEpochs;   //TODO критерии осановки тут
+
+
             while (teachRuns > 0)
             {
                 // run epoch of learning procedure
