@@ -74,11 +74,11 @@ namespace FeatureSelection
     {
         public EvaluationResult()
         {
-            ErrorHistory = new List<double>();
+            ValidationHistory = new List<double>();
         }
         public int CurrentIterationCount { get; set; }
         public double CurrentError { get; set; }
-        public List<double> ErrorHistory { get; set; }
+        public List<double> ValidationHistory { get; set; }
         public bool IsErrorOnTest { get; set; }
 
     }
@@ -123,6 +123,8 @@ namespace FeatureSelection
 
         public int ErrorPartNotChanged { get; set; }
 
+        public bool IsValidateOnTest { get; set; }
+
         #endregion
 
         public InformativeFitness(List<string> data)
@@ -165,6 +167,21 @@ namespace FeatureSelection
             ValidationOutpus = validResults;
         }
 
+        private bool TeachNextIteration(EvaluationResult evResult) // if returns true -> stop teaching
+        {
+            double _prev = 0;
+            bool iterationCompleated = evResult.CurrentIterationCount >= MaxIterationCount;
+            bool validationsGrows = evResult.ValidationHistory.Count >= ErrorPartNotChanged && evResult.ValidationHistory.Take(ErrorPartNotChanged).Select(d =>
+            {
+                bool res = _prev <= d;
+                _prev = d;
+                return res;
+            }).All(x => x);
+            bool currValidationBigger = evResult.CurrentError > ErrorPart;
+
+            return iterationCompleated || !validationsGrows || currValidationBigger;
+        }
+
         public override double Evaluate(IChromosome chromosome)
         {
             TakeInfornativeFeatures(chromosome);
@@ -192,15 +209,32 @@ namespace FeatureSelection
                 Momentum = Momentum
             };
             // loop
-            int teachRuns = MaxEpochs;   //TODO критерии осановки тут
+            //int teachRuns = MaxEpochs;   //TODO критерии осановки тут
+            var evaluationResult = new EvaluationResult()
+            {
+                CurrentError = 0,
+                CurrentIterationCount = 0,
+                ValidationHistory = new List<double>(),
+                IsErrorOnTest = IsValidateOnTest
+            };
+            bool teach = true;
 
-
-            while (teachRuns > 0)
+            while (teach)
             {
                 // run epoch of learning procedure
                 teacher.RunEpoch(OnlyFeaturesTrainInputs, TrainOutpus);
-                teachRuns--;
+                var teachResult = SolveErrors(network);
+                evaluationResult.CurrentError = evaluationResult.IsErrorOnTest ? teachResult.train : teachResult.validation;
+                evaluationResult.CurrentIterationCount++;
+                evaluationResult.ValidationHistory.Add(evaluationResult.IsErrorOnTest ? teachResult.train : teachResult.validation);
+
+                teach = !TeachNextIteration(evaluationResult);
             }
+            return SolveErrors(network).train;
+        }
+
+        private (double train,double validation) SolveErrors(ActivationNetwork network)
+        {
             var errorCounter = 0;
             for (int j = 0; j < OnlyFeaturesTrainInputs.Length; j++)
             {
@@ -208,6 +242,7 @@ namespace FeatureSelection
                 if (TrainOutpus[j][network.Output.IndexOf(network.Output.Max())] != 0.6)
                     errorCounter++;
             }
+
             var errorPart = errorCounter * 100.0 / (TrainOutpus.Length * 1.0);
             Console.WriteLine("learning rate {0}", 100 - errorPart);
 
@@ -220,13 +255,14 @@ namespace FeatureSelection
                 if (ValidationOutpus[j][network.Output.IndexOf(network.Output.Max())] != 0.6)
                     errorCounterTest++;
             }
+
             var errorPartTest = errorCounterTest * 100.0 / (ValidationOutpus.Length * 1.0);
             Console.WriteLine("testing rate {0}", 100 - errorPartTest);
 
 
-
-            return 100 - errorPartTest;
+            return (100 - errorPart, 100 - errorPartTest);
         }
+
         public static void Shuffle(ref double[][] inp, ref double[][] outp)
         {
             var list = new List<InfoContainer>();
