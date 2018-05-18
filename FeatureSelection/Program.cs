@@ -79,7 +79,7 @@ namespace FeatureSelection
         public int CurrentIterationCount { get; set; }
         public double CurrentError { get; set; }
         public List<double> ValidationHistory { get; set; }
-        public bool IsErrorOnTest { get; set; }
+        public bool IsErrorOnTrain { get; set; }
 
     }
 
@@ -123,7 +123,7 @@ namespace FeatureSelection
 
         public int ErrorPartNotChanged { get; set; }
 
-        public bool IsValidateOnTest { get; set; }
+        public bool IsValidateOnTrain { get; set; }
 
         #endregion
 
@@ -171,6 +171,7 @@ namespace FeatureSelection
         {
             double _prev = 0;
             bool iterationCompleated = evResult.CurrentIterationCount >= MaxIterationCount;
+            // TODO через запоминание итерации посдедного улучшеня
             bool validationsGrows = evResult.ValidationHistory.Count >= ErrorPartNotChanged && evResult.ValidationHistory.Take(ErrorPartNotChanged).Select(d =>
             {
                 bool res = _prev <= d;
@@ -215,7 +216,7 @@ namespace FeatureSelection
                 CurrentError = 0,
                 CurrentIterationCount = 0,
                 ValidationHistory = new List<double>(),
-                IsErrorOnTest = IsValidateOnTest
+                IsErrorOnTrain = IsValidateOnTrain
             };
             bool teach = true;
 
@@ -224,9 +225,9 @@ namespace FeatureSelection
                 // run epoch of learning procedure
                 teacher.RunEpoch(OnlyFeaturesTrainInputs, TrainOutpus);
                 var teachResult = SolveErrors(network);
-                evaluationResult.CurrentError = evaluationResult.IsErrorOnTest ? teachResult.train : teachResult.validation;
+                evaluationResult.CurrentError = evaluationResult.IsErrorOnTrain ? teachResult.train : teachResult.validation;
                 evaluationResult.CurrentIterationCount++;
-                evaluationResult.ValidationHistory.Add(evaluationResult.IsErrorOnTest ? teachResult.train : teachResult.validation);
+                evaluationResult.ValidationHistory.Add(evaluationResult.IsErrorOnTrain ? teachResult.train : teachResult.validation);
 
                 teach = !TeachNextIteration(evaluationResult);
             }
